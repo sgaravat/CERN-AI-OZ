@@ -1,0 +1,278 @@
+<template>
+ <name>cern_ai_glideinwms_glexec_x86_64</name>
+ <description>Scientific Linux 6.4 x86_64 for CERN AI</description>
+ <disk>
+   <size>10G</size>
+ </disk>
+ <os>
+  <name>SL-6</name>
+  <version>4</version>
+  <arch>x86_64</arch>
+  <install type='iso'>
+  <iso>file:///Images/SL_Mirror/6.4/x86_64/iso/SL-64-x86_64-2013-03-18-Install-DVD.iso</iso> 
+ <!--   <iso>http://mirror3.mirror.garr.it/mirrors/scientific/6.4/x86_64/iso/SL-64-x86_64-2013-03-18-Install-DVD.iso</iso> -->
+  </install>
+ </os>
+
+ <files>
+
+   <file name="/etc/fstab">
+/dev/vda1 / ext4 defaults,noatime 0 0
+devpts /dev/pts devpts gid=5,mode=620 0 0
+tmpfs      /dev/shm  tmpfs   defaults         0 0
+proc       /proc     proc    defaults         0 0
+sysfs      /sys      sysfs   defaults         0 0
+
+   </file>
+
+   <file name="/etc/sysconfig/network">
+NETWORKING=yes
+NOZEROCONF=yes      
+   </file>
+   
+   <file name="/etc/sysconfig/network-scripts/ifcfg-eth0">
+DEVICE=eth0
+BOOTPROTO=dhcp
+ONBOOT=yes
+TYPE=Ethernet   
+   </file>
+   
+  <file name="/etc/grid-security/vomsdir/cms/lcg-voms.cern.ch.lsc">
+/DC=ch/DC=cern/OU=computers/CN=lcg-voms.cern.ch
+/DC=ch/DC=cern/CN=CERN Trusted Certification Authority
+  </file>
+
+  <file name="/etc/grid-security/vomsdir/cms/voms.cern.ch.lsc">
+/DC=ch/DC=cern/OU=computers/CN=voms.cern.ch
+/DC=ch/DC=cern/CN=CERN Trusted Certification Authority
+  </file>
+ 
+  <file name="/etc/cvmfs/config.d/cms.cern.ch.local">
+export CMS_LOCAL_SITE=T2_CH_CERN_AI
+
+  </file>
+
+  <file name="/etc/cvmfs/default.local">
+CVMFS_REPOSITORIES=cms.cern.ch,grid.cern.ch
+CVMFS_HTTP_PROXY="http://ca-proxy.cern.ch:3128;http://lxbrb1413.cern.ch:3128|http://lxbrb1414.cern.ch:3128"
+CVMFS_QUOTA_LIMIT=10000
+  </file>
+
+  <file name="/etc/sysconfig/ephemeral_disks">
+LOGFILE=/var/log/cloudconfig.log
+VIRTUAL_DISKS="vdb xvdb sda2 sdb"
+  </file>
+
+  <file name="/etc/profile.d/grid-env.sh">
+#!/bin/sh
+# CMS environment settings
+export VO_CMS_SW_DIR="/cvmfs/cms.cern.ch"
+export VO_CMS_DEFAULT_SE="srm-eoscms.cern.ch"
+export SITE_NAME="T2_CH_CERN_AI"
+
+  </file>
+
+
+
+  <file name="/etc/lcmaps/lcmaps-glexec.db">
+# where to look for modules
+path = /usr/lib64/lcmaps
+ 
+# module definitions
+verify_proxy = "lcmaps_verify_proxy.mod" 
+               " -certdir /etc/grid-security/certificates/"
+               " --allow-limited-proxy"
+
+pepc        = "lcmaps_c_pep.mod"
+              " --pep-daemon-endpoint-url https://site-argus.cern.ch:8154/authz"
+              " -resourceid http://authz-interop.org/xacml/resource/resource-type/wn"
+              " -actionid http://glite.org/xacml/action/execute"
+              " -capath /etc/grid-security/certificates/"
+              " -pep-certificate-mode implicit"
+              " --use-pilot-proxy-as-cafile"
+
+glexec_get_account:
+verify_proxy -> pepc
+  </file>
+
+  <file name="/etc/glexec.conf">
+[glexec]
+silent_logging               = no
+log_level                    = 5
+user_white_list              = glidein_pilot
+linger                       = yes
+user_identity_switch_by      = glexec
+use_lcas                     = no
+lcmaps_db_file               = /etc/lcmaps/lcmaps-glexec.db
+lcmaps_log_file              = /var/log/lcas_lcmaps.log
+lcmaps_debug_level           = 5
+lcmaps_log_level             = 5
+lcmaps_get_account_policy    = glexec_get_account
+lcmaps_verify_account_policy = glexec_verify_account
+
+lcas_db_file                 = /etc/lcas/lcas-glexec.db
+lcas_log_file                = /var/log/lcas_lcmaps.log
+lcas_debug_level             = 5
+lcas_log_level               = 5
+preserve_env_variables       = no
+log_destination              = file
+  </file>
+
+  <file name="/etc/glideinwms/glidein-pilot.ini">
+[DEFAULT]
+contextualize_protocol = EC2
+default_max_lifetime = 172800
+ec2_url = http://169.254.169.254/latest/user-data
+
+[GLIDEIN_USER]
+user_name = glidein_pilot
+user_home = /home/glidein_pilot
+
+[DIRECTORIES]
+pre_script_dir = /usr/libexec/glideinwms_pilot/PRE
+post_script_dir = /usr/libexec/glideinwms_pilot/POST
+
+[CUSTOM_ENVIRONMENT]
+VO_CMS_SW_DIR = /cvmfs/cms.cern.ch
+VO_CMS_DEFAULT_SE = srm-eoscms.cern.ch
+SITE_NAME = T2_CH_CERN_AI
+
+  </file>
+
+  <file name="/etc/rc.d/rc.local" type="url">file:///root/OzImages/cern_ai_sl6_x86_64/rc.local</file>
+
+  <file name="/root/config_users" type="url">file:///root/OzImages/cern_ai_sl6_x86_64/config_users</file>
+
+  <file name="/root/users.conf" type="url">file:///root/OzImages/cern_ai_sl6_x86_64/users.conf</file>
+
+  <file name="/etc/init.d/mount_ephemeral" type="url">file:///root/OzImages/cern_ai_sl6_x86_64/mount_ephemeral</file>
+
+  <file name="/etc/ssh/sshd_config" type="url">file:///root/OzImages/cern_ai_sl6_x86_64/sshd_config</file>
+
+
+
+/file>
+
+
+
+</files>
+
+<repositories>
+
+  <repository name='epel-6'>
+    <url>http://download.fedoraproject.org/pub/epel/6/$basearch</url>
+    <signed>False</signed> 
+  </repository>
+
+  <repository name='WLCG-Repository'>
+   <url>http://linuxsoft.cern.ch/wlcg/sl6/$basearch</url>
+  </repository>
+
+  <repository name='EGI-trustanchors'>
+   <url>http://repository.egi.eu/sw/production/cas/1/current/</url>
+  </repository>
+
+</repositories>
+
+<packages>
+  <package name="cloud-init" />
+</packages>
+
+<commands>
+
+  <command name="removeudevnet">
+echo -n > /etc/udev/rules.d/70-persistent-net.rules
+echo -n > /lib/udev/rules.d/75-persistent-net-generator.rules
+  </command>
+
+  <command name="install-epel-repo">
+rpm --import http://dl.fedoraproject.org/pub/epel/RPM-GPG-KEY-EPEL
+rpm --import http://dl.fedoraproject.org/pub/epel/RPM-GPG-KEY-EPEL-6
+rpm -ivh http://dl.fedoraproject.org/pub/epel/6/x86_64/epel-release-6-8.noarch.rpm
+  </command>
+
+  <command name="install-emi-repo">
+rpm --import http://emisoft.web.cern.ch/emisoft/dist/EMI/2/RPM-GPG-KEY-emi
+yum -y install http://emisoft.web.cern.ch/emisoft/dist/EMI/2/sl6/x86_64/base/emi-release-2.0.0-1.sl6.noarch.rpm
+  </command>
+
+  <command name="install-cvmfs-repo">
+wget -O /etc/pki/rpm-gpg/RPM-GPG-KEY-CernVM http://cvmrepo.web.cern.ch/cvmrepo/yum/RPM-GPG-KEY-CernVM
+wget -O /etc/yum.repos.d/cernvm.repo http://cvmrepo.web.cern.ch/cvmrepo/yum/cernvm.repo
+  </command>
+
+  <command name="ec2user">
+adduser ec2-user -G adm,wheel
+  </command>
+
+
+  <command name="modify-sudoers">
+chmod +w /etc/sudoers
+sed -i 's/Defaults    requiretty/#Defaults    requiretty/g' /etc/sudoers
+echo "%wheel        ALL=(ALL)       NOPASSWD: ALL" >> /etc/sudoers
+chmod -w /etc/sudoers
+  </command>
+
+  <command name="install-middleware">
+yum clean all
+yum -y --nogpgcheck install ca-policy-egi-core
+yum -y --nogpgcheck install emi-wn
+yum -y --nogpgcheck install emi-glexec_wn
+yum -y --nogpgcheck install HEP_OSlibs_SL6
+  </command>
+
+  <command name="configure-pool-accounts">
+chmod +x /root/config_users
+. /root/config_users
+rm -f /root/config_users /root/users.conf
+  </command>
+
+  <command name="cvmfs">
+yum -y install cvmfs-keys cvmfs cvmfs-init-scripts
+chmod +r /etc/cvmfs/config.d/cms.cern.ch.local
+chmod +r /etc/cvmfs/default.local
+/usr/bin/cvmfs_config setup
+/sbin/service autofs start
+/sbin/chkconfig autofs on
+  </command>
+
+  <command name="Ephemeral-disk">
+chmod +x /etc/init.d/mount_ephemeral
+/sbin/chkconfig mount_ephemeral on
+  </command>
+
+
+  <command name="install-pilot-launcher">
+rpm -Uvh http://www.hep.ph.ic.ac.uk/~mhuffman/cloud/glideinwms/el6/glideinwms-vm-core-0.3-4.el6.noarch.rpm
+#rpm -Uvh http://www.hep.ph.ic.ac.uk/~mhuffman/cloud/glideinwms/el6/glideinwms-vm-openstack-0.3-4.el6.noarch.rpm
+  </command>
+
+
+  <command name="env-scripts">
+chmod +rx /etc/profile.d/grid-env.sh 
+  </command>
+
+
+  <command name="modify-grub">
+sed -i '/kernel/ s|$| selinux=0 console=tty0 console=ttyS0|' /boot/grub/grub.conf
+  </command>
+
+  <command name="disable-yum-autoupdate">
+sed -i 's/^ENABLED=.*$/ENABLED="false"/' /etc/sysconfig/yum-autoupdate
+  </command>
+
+  <command name="misc">
+mkdir /data
+chmod +x /etc/rc.d/rc.local
+chmod +r /etc/grid-security/vomsdir/cms/lcg-voms.cern.ch.lsc
+chmod +r /etc/grid-security/vomsdir/cms/voms.cern.ch.lsc
+chmod g+r /etc/lcmaps/lcmaps-glexec.db
+chown root.glexec /etc/glexec.conf
+chmod g+r /etc/glexec.conf
+chmod +r /etc/glideinwms/glidein-pilot.ini
+  </command>
+
+
+</commands>
+
+</template>

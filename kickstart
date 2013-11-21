@@ -1,0 +1,29 @@
+install
+text
+key --skip
+keyboard us
+lang en_US
+skipx
+network --bootproto dhcp 
+rootpw --plaintext 4manddgg209uT2
+
+# authconfig
+authconfig --enableshadow --enablemd5
+
+selinux --disabled
+#service --enabled=ssh
+timezone --utc Europe/Rome
+
+bootloader --location=mbr --append="console=tty0 console=ttyS0,115200"
+zerombr
+clearpart --all
+part / --fstype ext4 --size 200 --grow
+
+reboot
+
+%packages
+@core
+@base
+wget
+emacs
+libxslt

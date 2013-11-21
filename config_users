@@ -1,0 +1,165 @@
+#!/bin/sh
+
+function get_vo_param() {
+    VO=`echo $1 | tr '[:upper:]' '[:lower:]'`           # make sure the VO name is in lower case, as it should be in VOS variable.
+    unset return_val
+    if [ -f /tmp/.vo.d/${VO} ] ; then
+        return_val=$(
+            source /tmp/.vo.d/${VO}
+            eval echo '$'`echo $2`
+        )
+    else
+        VO=`echo $VO | sed -e 's/-/_/g' -e 's/\./_/g'`  # Transform DNS-like VO names into "_" in case they are defined in site-info.def
+        return_val=$(
+            eval echo '$'VO_`echo $VO | tr '[:lower:]' '[:upper:]'`_$2
+        )
+    fi
+    echo $return_val
+}
+
+
+# Main
+
+
+    USERS_CONF=/root/users.conf
+    VOS=cms
+
+    grid_accounts=
+    newline='
+'
+    ####@ Check if pool accounts for VOs are defined in $USERS_CONF file.
+    for vo in $VOS; do 
+      # Take the groups of all entries belonging to the VO and without a 
+      # specific tag. The most numerous result is taken into account.
+      # UserId:User:GroupId:Group:VO:Flag:
+      #   $1    $2    $3      $4  $5  $6
+      v=$(awk -F: '$6=="" && $5 == tolower(vo){print $4}' vo=$vo ${USERS_CONF} \
+        	| sort | uniq -c | sort -n -k 1,1 | tail -1 | awk '{print $2}')
+      if [ -z $v ]; then
+        echo "VO $vo doesn't have pool accounts defined in $USERS_CONF"
+      fi
+    done
+
+    ####@ Generate a list of missing users
+    PASSWD=`mktemp /root/yaim.XXXXXX`
+    MISSING=`mktemp /root/yaim.XXXXXX`
+    getent passwd | sort -t: -k1,1 > $PASSWD
+    sort -t: -k2,2 $USERS_CONF | join -v 2 -t: -1 1 -2 2 $PASSWD - > $MISSING
+    rm -f $PASSWD
+
+    ####@ Adds all users/groups for each VO in ${VOS}
+    while IFS=: read id user gids groups virtorg tag other; do
+
+      # Skip blank lines
+      if [ "x$id" = "x" ]; then
+        echo "Skipping blank line in ${USERS_CONF}."
+        continue
+      fi
+      # Skip user if VO not supported
+      if ! ( [ "$virtorg" ] && echo $VOS | grep -w "$virtorg" >/dev/null ); then
+        echo "Skipping user ${user}, VO (${virtorg} not supported.)"
+        continue
+      fi
+      # Specify user home if defined by the sys admin
+      unset useradd_args
+      home_dir=`get_vo_param ${virtorg} USER_HOME_PREFIX`
+      if [ "x${home_dir}" != "x" ]; then
+        echo "USER_HOME_PREFIX is specified for VO ${virtorg}" 
+        useradd_args="-d `eval echo "\${home_dir}"`/$user"    
+      else
+        if [ "x${USER_HOME_PREFIX}" != "x" ]; then
+          echo "USER_HOME_PREFIX is specified for all the VOs"
+          useradd_args="-d `eval echo "\${USER_HOME_PREFIX}"`/$user"
+        fi
+      fi
+
+      # Add group
+      gids=`echo $gids | sed -e 's/,/ /g'`
+      groups=`echo $groups | sed -e 's/,/ /g'`
+      initialgroup=`echo $groups | cut -d " " -f 1`
+      additionalgroups=`echo $groups | cut -d " " -f 2- -s`
+      SED="s/ $initialgroup / /g;s/ - / /g;s/  */ /g;s/^ //;s/ $//;s/ /,/g"
+      additionalgroups=`echo " $additionalgroups " | sed "$SED"`
+      [ -z "$additionalgroups" ] || additionalgroups="-G $additionalgroups"
+
+      for group in $groups; do
+
+       gid=` echo $gids | cut -d " " -f 1`
+       gids=`echo $gids | cut -d " " -f 2- -s`
+       if [ -z "$gid" ]; then
+           echo "User '$user' has group '$group' without GID defined !"
+           echo "Please, specify a GID for group '$group', user '$user'"
+           exit 1
+       fi
+
+       if [ "x$group" = "x-" ] && [ "x$gid" != "x-" ]; then
+	   echo "User '$user' has group '-'. GID must be '-' !"
+           echo "Please, specify GID '-' for group '-', user '$user'"
+           exit 1
+       fi
+
+       if [ "x$group" != "x-" ] && [ "x$gid" = "x-" ]; then
+	   echo "User '$user' has group '$group' with GID '-' !"
+           echo "Please, specify a GID for group '$group', user '$user'"
+           exit 1
+       fi
+
+       if [ "x$group" = "x-" ]; then
+	   echo "No secondary groups configured for user '$user'."
+	   continue
+       fi
+
+       if ! (getent group $group >/dev/null || groupadd -g $gid $group); then
+           echo  "Group '$group' with gid '$gid' for user '$user' failed to be created !"
+           exit 1
+       else
+         echo "Group '$group' with gid '$gid' for user '$user' succesfully created."
+       fi
+
+      done # Add group
+
+      useradd -m -p "*NP*" -c "mapped user for group $initialgroup" \
+         -u $id -g $initialgroup $additionalgroups ${useradd_args} $user
+      ret=$?
+      if [ $ret -ne 0 ]; then
+        echo "useradd command for $user with uid '$id' failed."
+        if [ $ret -ne 9 ]; then
+          userdel $user > /dev/null 2>&1
+          echo "ran userdel for $user to try to cleanup."
+        fi
+        exit 1
+      fi 
+    
+      ####@ Disables cron for pool users, grid users shall not be able to submit at or cron jobs.
+      for deny in /etc/at.deny /etc/cron.deny; do
+        tmp=$deny.$$
+        touch $deny
+        (grep -v "^$user\$" $deny; echo "$user") > $tmp && mv $tmp $deny
+      done
+
+    done < ${MISSING} # Add user
+    rm -f ${MISSING}
+    unset MISSING
+
+    # Some things we need to do on every reconfiguration
+    while IFS=: read id user gids groups virtorg tag other; do
+
+      # Skip blank lines
+      if [ "x$id" = "x" ]; then
+        echo "Skipping blank line in ${USERS_CONF}."
+        continue
+      fi
+      # Skip user if VO not supported
+      if ! ( [ "$virtorg" ] && echo $VOS | grep -w "$virtorg" >/dev/null ); then
+        echo "Skipping user ${user} since its VO (${virtorg}) is not supported."
+        continue
+      fi
+      grid_accounts="$grid_accounts$newline$user"
+
+    done < $USERS_CONF
+
+
+
+
+
+

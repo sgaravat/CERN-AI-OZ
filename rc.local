@@ -1,0 +1,107 @@
+#!/bin/sh
+
+touch /var/lock/subsys/local
+
+
+# Ensure devpts is mounted to prevent ssh hang-ups
+mount | grep devpts > /dev/null 2>&1
+if [ $? -ne 0 ] ; then
+    devpts="none   /dev/pts   devpts  gid=5,mode=620 0 0"
+    ( grep -v "\#" /etc/fstab | grep devpts > /dev/null 2>&1 ) || echo $devpts >> /etc/fstab
+    mount -a >/dev/null 2>&1
+fi
+
+# Randomise the root password as the last operation
+# We ideally have some more entropy at this stage
+echo "-----RANDOMISING ROOT PASSWORD-----"|logger -s -t "ec2"
+dd if=/dev/urandom count=128 2>/dev/null|md5sum|passwd --stdin root >/dev/null 2>&1
+
+# Regenerate the host keys at this stage
+# Having more entropy to work with
+echo "-----TRIGGERING HOST KEYS REGENERATION-----"|logger -s -t "ec2"
+
+ssh_dir=`ls -la /etc/ssh/`
+echo "SSH directory contents:"|logger -s -t "ec2"
+echo $ssh_dir|logger -s -t "ec2"
+
+echo "Removing existing keys"|logger -s -t "ec2"
+rm -f /etc/ssh/ssh_host_key.pub \ 
+      /etc/ssh/ssh_host_rsa_key.pub
+      /etc/ssh/ssh_host_dsa_key.pub \
+      /etc/ssh/ssh_host_key \
+      /etc/ssh/ssh_host_rsa_key \
+      /etc/ssh/ssh_host_dsa_key
+
+# =*Output ssh host keys to console*=
+[ -f /etc/ssh/ssh_host_key ] || (ssh-keygen -f /etc/ssh/ssh_host_key -t rsa1 -C 'host' -N '' | logger -s -t "ec2")
+[ -f /etc/ssh/ssh_host_rsa_key ] || (ssh-keygen -f /etc/ssh/ssh_host_rsa_key -t rsa  -C 'host' -N '' | logger -s -t "ec2")
+[ -f /etc/ssh/ssh_host_dsa_key ] || (ssh-keygen -f /etc/ssh/ssh_host_dsa_key -t dsa  -C 'host' -N '' | logger -s -t "ec2")
+
+echo "-----BEGIN SSH HOST KEY FINGERPRINTS-----" |logger -s -t "ec2"
+ssh-keygen -l -f /etc/ssh/ssh_host_key.pub |logger -s -t "ec2"
+ssh-keygen -l -f /etc/ssh/ssh_host_rsa_key.pub |logger -s -t "ec2"
+ssh-keygen -l -f /etc/ssh/ssh_host_dsa_key.pub |logger -s -t "ec2"
+echo "-----END SSH HOST KEY FINGERPRINTS-----"   |logger -s -t "ec2"
+
+echo "Bouncing sshd to force regeneration"|logger -s -t "ec2"
+/sbin/service sshd restart
+echo "Setting sshd to start as a service"|logger -s -t "ec2"
+/sbin/chkconfig --level 2345 sshd on
+
+# Nimbus needs to have /root/.ssh created so that the create-keypair call will 
+# succeed - shouldn't hurt on an Amazon EC2 image
+mkdir -p /root/.ssh
+chmod 0700 /root/.ssh
+chown root:root /root/.ssh
+
+# We do this manually for root since boxgrinder will only append code to grab
+# the key for ec2-user.
+ATTEMPTS=5
+FAILED=0
+# Fetch public key using HTTP
+while [ ! -f /root/.ssh/authorized_keys ]; do
+ key=`curl http://169.254.169.254/latest/meta-data/public-keys/0/openssh-key 2>/dev/null`
+ if [ $? -eq 0 ]; then
+    actual_key=`echo $key | awk '{ print $2 }'`
+    echo $key >> /root/.ssh/authorized_keys
+    chmod 600 /root/.ssh/authorized_keys
+    chown root:root /root/.ssh/authorized_keys
+    echo "Successfully retrieved AWS public key from instance metadata:"|logger -s -t "ec2"
+    echo $key
+ else
+        FAILED=$(($FAILED + 1))
+        if [ $FAILED -ge $ATTEMPTS ]; then
+            echo "Failed to retrieve AWS public key after $FAILED attempts, quitting"|logger -s -t "ec2"
+            break
+        fi
+        echo "Could not retrieve AWS public key (attempt #$FAILED/$ATTEMPTS), retrying in 5 seconds..."|logger -s -t "ec2"
+        sleep 5
+ fi
+done
+
+# update to latest available certs
+yum update -y ca-policy-egi-core
+
+
+# Start desired services
+echo "Setting fetch-crl-cron to start as a service"|logger -s -t "ec2"
+/sbin/service fetch-crl-cron start
+#
+# Ensure CVMFS running
+
+echo "Checking CVMFS access to CMS area..."|logger -s -t "ec2"
+
+cd /cvmfs/cms.cern.ch
+sleep 5
+ls /cvmfs/cms.cern.ch/cmsset_default.sh
+
+if 
+	[ -e  "/cvmfs/cms.cern.ch/cmsset_default.sh" ]
+then
+	echo "/cvmfs/cms.cern.ch/cmsset_default.sh exists"|logger -s -t "ec2"
+	echo "CVMFS check passed"|logger -s -t "ec2"
+	exit
+else
+	echo "CVMFS check failed"|logger -s -t "ec2"
+#	/sbin/poweroff
+fi

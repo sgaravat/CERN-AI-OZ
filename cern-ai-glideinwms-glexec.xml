@@ -118,27 +118,6 @@ preserve_env_variables       = no
 log_destination              = file
   </file>
 
-  <file name="/etc/glideinwms/glidein-pilot.ini">
-[DEFAULT]
-contextualize_protocol = EC2
-default_max_lifetime = 172800
-ec2_url = http://169.254.169.254/latest/user-data
-
-[GLIDEIN_USER]
-user_name = glidein_pilot
-user_home = /home/glidein_pilot
-
-[DIRECTORIES]
-pre_script_dir = /usr/libexec/glideinwms_pilot/PRE
-post_script_dir = /usr/libexec/glideinwms_pilot/POST
-
-[CUSTOM_ENVIRONMENT]
-VO_CMS_SW_DIR = /cvmfs/cms.cern.ch
-VO_CMS_DEFAULT_SE = srm-eoscms.cern.ch
-SITE_NAME = T2_CH_CERN_AI
-
-  </file>
-
   <file name="/etc/rc.d/rc.local" type="url">file:///root/OzImages/cern_ai_sl6_x86_64/rc.local</file>
 
   <file name="/root/config_users" type="url">file:///root/OzImages/cern_ai_sl6_x86_64/config_users</file>
@@ -243,8 +222,7 @@ chmod +x /etc/init.d/mount_ephemeral
 
 
   <command name="install-pilot-launcher">
-rpm -Uvh http://www.hep.ph.ic.ac.uk/~mhuffman/cloud/glideinwms/el6/glideinwms-vm-core-0.3-4.el6.noarch.rpm
-#rpm -Uvh http://www.hep.ph.ic.ac.uk/~mhuffman/cloud/glideinwms/el6/glideinwms-vm-openstack-0.3-4.el6.noarch.rpm
+rpm -ivh https://dl.dropboxusercontent.com/u/7639059/Cern-AI/glideinwms-vm-core-0.4-0.2.rc2.el6.noarch.rpm https://dl.dropboxusercontent.com/u/7639059/Cern-AI/glideinwms-vm-ec2-0.4-0.2.rc2.el6.noarch.rpm
   </command>
 
 

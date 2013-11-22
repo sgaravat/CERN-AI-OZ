@@ -118,19 +118,17 @@ preserve_env_variables       = no
 log_destination              = file
   </file>
 
-  <file name="/etc/rc.d/rc.local" type="url">file:///root/OzImages/cern_ai_sl6_x86_64/rc.local</file>
+  <file name="/etc/rc.d/rc.local" type="url">file:///root/OzImages/CERN-AI-OZ/rc.local</file>
 
-  <file name="/root/config_users" type="url">file:///root/OzImages/cern_ai_sl6_x86_64/config_users</file>
+  <file name="/root/config_users" type="url">file:///root/OzImages/CERN-AI-OZ/config_users</file>
 
-  <file name="/root/users.conf" type="url">file:///root/OzImages/cern_ai_sl6_x86_64/users.conf</file>
+  <file name="/root/users.conf" type="url">file:///root/OzImages/CERN-AI-OZ/users.conf</file>
 
-  <file name="/etc/init.d/mount_ephemeral" type="url">file:///root/OzImages/cern_ai_sl6_x86_64/mount_ephemeral</file>
+  <file name="/etc/init.d/mount_ephemeral" type="url">file:///root/OzImages/CERN-AI-OZ/mount_ephemeral</file>
 
-  <file name="/etc/ssh/sshd_config" type="url">file:///root/OzImages/cern_ai_sl6_x86_64/sshd_config</file>
+  <file name="/etc/ssh/sshd_config" type="url">file:///root/OzImages/CERN-AI-OZ/sshd_config</file>
 
 
-
-/file>
 
 
 

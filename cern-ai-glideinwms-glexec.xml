@@ -2,7 +2,7 @@
  <name>cern_ai_glideinwms_glexec_x86_64</name>
  <description>Scientific Linux 6.4 x86_64 for CERN AI</description>
  <disk>
-   <size>10G</size>
+   <size>3G</size>
  </disk>
  <os>
   <name>SL-6</name>

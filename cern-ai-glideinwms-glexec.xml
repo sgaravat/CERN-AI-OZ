@@ -128,8 +128,7 @@ log_destination              = file
 
   <file name="/etc/ssh/sshd_config" type="url">file:///root/OzImages/CERN-AI-OZ/sshd_config</file>
 
-
-
+  <file name="/etc/ganglia/gmond.conf" type="url">file:///root/OzImages/CERN-AI-OZ/gmond.conf</file>
 
 
 </files>
@@ -222,6 +221,12 @@ chmod +x /etc/init.d/mount_ephemeral
   <command name="install-pilot-launcher">
 rpm -ivh https://dl.dropboxusercontent.com/u/7639059/Cern-AI/glideinwms-vm-core-0.4-0.2.rc2.el6.noarch.rpm https://dl.dropboxusercontent.com/u/7639059/Cern-AI/glideinwms-vm-ec2-0.4-0.2.rc2.el6.noarch.rpm
   </command>
+
+  <command name="install-ganglia">
+yum -y install ganglia-gmond
+/sbin/chkconfig gmond on
+/sbin/service gmond start
+</command>
 
 
   <command name="env-scripts">
